@@ -50,11 +50,18 @@ def taginfo(user_id, num_tags = -1, return_sort = True):
 	newline_str = "\n"           # newline string
 	mult_str = "\xd7"            # unicode hex string as they appear right after each tag name
 	nobreak_str = "\xa0"         # no-break space that appears after hex string
-		
+
+	# Calculate number of tag pages to be scanned
+	timeout_max_pages = 100
+	if num_tags!=-1:
+		max_pages = int(np.ceil(num_tags/52.0))+1
+	else:
+		max_pages = timeout_max_pages
+
+	# Start processing		
 	tag_name = []
 	tag_count = []
-	pagestartID = 1
-	max_pages = int(np.ceil(num_tags/52.0))+1
+	pagestartID = 1		
 	for page_id in range(pagestartID,max_pages):
 		
 		# Get link for each tag page iteratively
