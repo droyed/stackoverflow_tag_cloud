@@ -4,7 +4,7 @@
 ###Examples###
 Stackoverflow's highest reputation user [Jon Skeet](http://stackoverflow.com/users/22656/jon-skeet)'s first `200` tags produced using [example_extensive.py](https://github.com/droyed/stackoverflow_tag_cloud/blob/master/example_extensive.py) -
 
-!(http://i.imgur.com/dokeSOc.jpg)
+(http://i.imgur.com/dokeSOc.jpg)
 
 ###Requirements###
 * Python 2.7.
