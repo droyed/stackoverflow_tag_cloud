@@ -2,6 +2,8 @@ from bs4 import BeautifulSoup
 import numpy as np
 import requests
 import itertools
+import sys
+from wordcloud import WordCloud
 
 def toint(a):
     """ Convert string to int and also scale them accordingly if they end 
@@ -14,7 +16,7 @@ def toint(a):
     return int(a)
 
 
-def taginfo(link, num_tags = -1, return_sort = True):
+def taginfo(link, num_tags = None, return_sort = True, print_page_count = False):
     """ Get information about Stack Overflow and all Stack Exchange sites users' 
     tags (tags and corresponding tag points scored). 
     This could be directly used with wordcloud module for generating a tag cloud.
@@ -62,9 +64,22 @@ def taginfo(link, num_tags = -1, return_sort = True):
     # Html codes to be detected for parsing relevant info
     tag_start_str = " Tags\r\n"  # html parsing string to detect start of tag block
     newline_str = "\n"           # newline string
-    mult_str =  "\xc3\x97"       # utf-8 encoded hex string as they appear right after each tag name
-    nobreak_str = "\xc2\xa0"     # utf-8 encoded no-break space that appears after hex string
     timeout_max_pages = 100      # Max number of pages to be scanned (acts as a timeout criteria)
+        
+    
+    # Detect the indices for newlines
+    start_link0 = start_link + "1"
+    soup = BeautifulSoup(requests.get(start_link0).text,"lxml")
+    texts = soup.findAll(text=True)
+    idx_nl = np.where([item.startswith(tag_start_str) for item in texts])[0]
+    
+    # If an invalid webpage were fed, we would have empty idx_nl. 
+    # If so, exit out with None.
+    if len(idx_nl)==0:
+        return None
+
+    if num_tags==None: 
+        num_tags = int(texts[idx_nl[0]-1].replace(",",""))
 
     # Set number of tag pages to be scanned
     max_pages = timeout_max_pages
@@ -76,41 +91,36 @@ def taginfo(link, num_tags = -1, return_sort = True):
     tag_count = []
     for page_id in range(1,max_pages):
         
+        if print_page_count==1:
+            print("Processing page : " + str(page_id) + "/" + str(max_pages-1))
+            sys.stdout.flush()
+        
         # 1. Get link for each tag page iteratively. Extract text only info
         link = start_link + str(page_id)        
+
+        # 2. Get webpage text data
         soup = BeautifulSoup(requests.get(link).text,"lxml")
         texts = soup.findAll(text=True)
-        
-        # 2.Crop out tag block from the text
-        ## Detect starting index of tag block and crop "texts" starting at it
-        start_idx = np.where([item.startswith(tag_start_str) for item in texts])[0]
-        if len(start_idx)==0:
-            # Error : Tag block start not found. Most probably the profile does not exist!
-            return -1
-        texts1 = texts[start_idx:]
             
-        ## Detect ending index of tag block and thus crop out tag block
-        N = 8 # parameter used for convolution to find start, stop of tag block        
-        stop_idx = np.where(np.convolve([item.startswith(newline_str) for item in texts1],np.ones(N),'same')>=N)[0] - N/2
-        tag_block = texts[start_idx+stop_idx[0]+N:start_idx+stop_idx[1]]
-        if len(tag_block)==0:
-            break
-
-        # 3. Remove irrelevant text from tag block
-        ## Masks to detect newlines and hex strings
-        newline_str_mask = np.array([item.startswith(newline_str) for item in tag_block])        
-        mult_str_mask = np.array([item.encode("utf-8").startswith(mult_str) for item in tag_block])        
-
-        ## Common mask to detect no-break space and the immediate next string
-        nobreak_str_mask = np.convolve([item.encode("utf-8").startswith(nobreak_str) for item in tag_block],np.ones(2),'same')>0
-
-        # Remove irrelevnt info with masks, leaving us with tag names and counts
-        select_idx = np.where(~(newline_str_mask | mult_str_mask | nobreak_str_mask))[0]
-        out_info = [str(tag_block[id]) for id in select_idx]
-
-        ## 4. Finally separate out names and counts into two lists
-        tag_name.append(out_info[1::2])
-        tag_count.append([toint(item) for item in out_info[::2]])
+        # 3. Get block of text data that contains tag info (name and score/count)
+        start_idx = np.where([item.startswith(tag_start_str) for item in texts])[0][0]
+        texts1 = np.array(texts[start_idx:])
+        
+        # 4. Detect ending index of tag block and thus crop out tag block
+        N1 = 8 # parameter used for convolution to find start, stop of tag block   
+        N2 = 2 # no. of newlines used right before each tag count
+        sep_idx = np.where(np.convolve(texts1 == newline_str, np.ones(N1))==N1)[0]
+        tagcode = texts1[sep_idx[0]-1 : sep_idx[1]]
+        
+        # 5. Get tag names and count
+        idx1 = np.convolve(tagcode == newline_str, np.ones(N2),'same')>=N2
+        idx2 = np.flatnonzero(idx1[1:] < idx1[:-1])+1
+        page_tag_count = [toint(i.encode("utf-8")) for i in tagcode[idx2]]
+        page_tag_name = [i.encode("utf-8") for i in tagcode[idx2+2]]
+        
+        ## 6. Finally accumulate data into output lists
+        tag_name.append(page_tag_name)
+        tag_count.append(page_tag_count) 
         
     # III. For a case when all tag counts are zeros, it would throw error.
     # So, for such a case, escape it by setting all counts to "1".
@@ -122,5 +132,42 @@ def taginfo(link, num_tags = -1, return_sort = True):
     if return_sort:
         info = [info[idx] for idx in np.argsort([item[1] for item in info])[::-1]]
     return info
-
     
+    
+def tag_cloud(link=22656, num_tags = 200, image_dims = (400, 200), out_filepath = "TagCloud.png"):
+    
+    """ Generate tag cloud and save it as an image.
+
+    Parameters
+    ----------
+    
+    link : same as used for the function taginfo.
+
+    num_tags : same as used for the function taginfo.
+
+    image_dims : tuple of two elements.
+        Image dimensions of the tag cloud image to be saved.
+        
+    out_filepath : string
+        Output image filepath.
+        
+    Output
+    ------
+    
+    None
+    """
+
+    W, H = image_dims    # Wordcloud image size (width, height)
+    font_path = "fonts/ShortStack-Regular.ttf" # Font path    
+    info = taginfo(link = link, num_tags = num_tags)
+    if info==None: 
+        print("Error : No webpage found!")
+    else:    
+        if len(info)==0:
+            print("Error : No tags found!")
+        else:         # Successfully extracted tag info
+            WC = WordCloud(font_path=font_path, width=W, height=H, \
+                    max_words=len(info)).generate_from_frequencies(info)
+            WC.to_image().save(out_filepath)
+            print("Tag Cloud Saved as " + out_filepath)
+        
