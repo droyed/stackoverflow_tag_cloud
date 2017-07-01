@@ -8,10 +8,8 @@
 
 Let's take Stack Overflow's highest reputation user [Jon Skeet](http://stackoverflow.com/users/22656/jon-skeet) as the sample. His profile page link has the ID : `22656`. So, a minimal Python script to generate his tag-cloud would be -
 
-	from stackoverflow_users_taginfo import tag_cloud
-	
-	tag_cloud(link = 22656)
-
+	>>> from stackoverflow_users_taginfo import tag_cloud
+	>>> tag_cloud(link = 22656)
 
 Giving it more options, here's a tag-cloud with the first **`1000`** tags on a `4K canvas` being produced using [example_extensive.py](https://github.com/droyed/stackoverflow_tag_cloud/blob/master/example_extensive.py) -
 
