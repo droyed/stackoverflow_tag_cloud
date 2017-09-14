@@ -35,7 +35,7 @@ def toint(a):
 
 def info_mainpage(url):
     """ Given the main tag page, this function gets basic information about tag
-    pages and tag names and their scores as well. 
+    pages and tag names and their scores as well.
     On the basic info, there are three numbers scraped :
     1. Number of tag pages
     2. Total number of tags
@@ -45,15 +45,15 @@ def info_mainpage(url):
     ----------
     url : string
         URL link to user's main tag page.
-    
+
     Output
     ------
     pginfo : dict
         Dictionary that holds the three page info as listed earlier.
-        
+
     name : list of strings
         Holds the tag names
-        
+
     count : list of ints
         Holds the tag scores
     """
@@ -81,19 +81,19 @@ def info_mainpage(url):
 
 def stackoverflow_taginfo(url):
     """ Get information about an user's tags from their Stack Overflow
-    tag pages fed as the input URL. Mainly two pieces of information are scraped :
-    tag names and their respective counts/scores.
+    tag pages fed as the input URL. Mainly two pieces of information are
+    scraped : tag names and their respective counts/scores.
 
     Parameters
     ----------
     url : string
         URL link to user's main tag page.
-    
+
     Output
     ------
     name : list of strings
         Holds the tag names
-        
+
     count : list of ints
         Holds the tag scores
     """
