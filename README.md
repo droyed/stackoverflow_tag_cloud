@@ -24,7 +24,7 @@ As a demo on extracting tag information and generating tag-cloud from other Q&A 
 We are living in `8K` age, so here's [Jon Skeet's `1000` tags on `8K` canvas](https://raw.githubusercontent.com/droyed/stackoverflow_tag_cloud/master/example_output/8K.png)!
 
 ## Requirements
-* Python 2.x.
+* Python 2.x or 3.x.
 * Python modules : NumPy, Requests, itertools.
 * [BeautifulSoup](http://www.crummy.com/software/BeautifulSoup/) - To extract html information. Works with version 4.4.1, might work with older versions too, but not tested. 
-* [Word_cloud](https://github.com/amueller/word_cloud) - Word cloud creation.
+* [Word_cloud](https://github.com/amueller/word_cloud) - Word cloud creation : Version 1.3.1 or newer.
