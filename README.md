@@ -1,5 +1,22 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+# Dependencies
+* BeautifulSoup - https://www.crummy.com/software/BeautifulSoup/
+* WordCloud - https://github.com/amueller/word_cloud
+
+Use the `requirements.txt` file to install the dependencies:
+
+```
+pip install -r requirements.txt
+```
+
+You can also install them yourself through `pip`:
+
+```
+pip install bs4
+pip install wordcloud
+```
+
 # Stack Overflow (Stack Exchange) Users Tag Cloud
 [**Stack Exchange**](http://stackexchange.com/) is a network of `Q&A` websites covering various fields. Users earn reputation and score tag points based on the tags of the questions and answers they involve themselves with. Each user has a tag section under his/her profile page that lists the tag names and the respective counts. The Python scripts in this repository parse and extract the tag names and scores, which could then be fed to [wordcloud module for Python](https://github.com/amueller/word_cloud) to produce a word cloud image with tags being the words and their respective sizes being proportional to the respective scores. The scripts could extract such information from [**all Stack Exchange Q&A sites**](http://stackexchange.com/sites), including of course it's biggest `Q&A` site 
 [**Stack Overflow**](http://stackoverflow.com/).
