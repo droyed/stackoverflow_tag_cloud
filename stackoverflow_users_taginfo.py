@@ -158,20 +158,30 @@ def taginfo(link, lim_num_tags=None, return_sort=True, print_page_count=False):
     tag_name = []
     tag_count = []
 
+    if print_page_count:
+        print("Processing page : 1/NA")        
+
     info1 = info_mainpage(start_link + '1')
-    fields = ['pages', 'tags', 'tags_perpage']
-    num_pages, num_tags, tags_per_page = [info1[0][i] for i in fields]
+    num_tags = info1[0]['tags']
     tag_name.append(info1[1])
     tag_count.append(info1[2])
+    tags_per_page = len(info1[1])
+    
+    if lim_num_tags is None:
+        num_tags = info1[0]['tags']
+    else:
+        num_tags = min(lim_num_tags, info1[0]['tags'])
+    num_pages = int(np.ceil(num_tags/tags_per_page))
 
-    num_tags = min(lim_num_tags, num_tags)
-    lim_num_tags = [num_tags if lim_num_tags is None else num_tags][0]
+    print('tags_per_page : '+str(tags_per_page))
+    print('num_tags : '+str(num_tags))
+    print('num_pages : '+str(num_pages))
+
     if num_pages > 1:
         num_pages = int(np.ceil(lim_num_tags/float(tags_per_page)))
         for page_id in range(2, num_pages+1):
             if print_page_count:
-                print("Processing page#" + str(page_id) + "/" + str(num_pages))
-                sys.stdout.flush()
+                print("Processing page : " + str(page_id) + "/" + str(num_pages))
 
             url = start_link + str(page_id)
             page_tag_name, page_tag_count = stackoverflow_taginfo(url)
@@ -190,9 +200,36 @@ def taginfo(link, lim_num_tags=None, return_sort=True, print_page_count=False):
 
     return dict_info
 
+def draw_taginfo(info, 
+                 image_dims, 
+                 out_filepath,
+                 skip_tags = [],
+                 font_path="fonts/ShortStack-Regular.ttf",
+                 ):
+    
+    W, H = image_dims    # Wordcloud image size (width, height)
+    for sk in skip_tags:
+        del info[sk]
+                  
+    if info is None:
+        print("Error : No webpage found!")
+    else:
+        if len(info) == 0:
+            print("Error : No tags found!")
+        else:         # Successfully extracted tag info
+            WC = WordCloud(font_path=font_path, width=W, height=H,
+                           max_words=len(info)).generate_from_frequencies(info)
+            WC.to_image().save(out_filepath)
+            print("Tag Cloud Saved as " + out_filepath)
+            
+    return
 
-def tag_cloud(link=22656, lim_num_tags=200, image_dims=(400, 200),
-              out_filepath="TagCloud.png"):
+def tag_cloud(link=22656, 
+              lim_num_tags=200, 
+              image_dims=(400, 200),
+              skip_tags = [],
+              out_filepath="TagCloud.png",
+              ):
     """ Generate tag cloud and save it as an image.
 
     Parameters
@@ -212,16 +249,6 @@ def tag_cloud(link=22656, lim_num_tags=200, image_dims=(400, 200),
     None
     """
 
-    W, H = image_dims    # Wordcloud image size (width, height)
-    font_path = "fonts/ShortStack-Regular.ttf"  # Font path
-    info = taginfo(link=link, lim_num_tags=lim_num_tags)
-    if info is None:
-        print("Error : No webpage found!")
-    else:
-        if len(info) == 0:
-            print("Error : No tags found!")
-        else:         # Successfully extracted tag info
-            WC = WordCloud(font_path=font_path, width=W, height=H,
-                           max_words=len(info)).generate_from_frequencies(info)
-            WC.to_image().save(out_filepath)
-            print("Tag Cloud Saved as " + out_filepath)
+    info = taginfo(link=link, lim_num_tags=lim_num_tags)    
+    draw_taginfo(info, image_dims=image_dims, out_filepath=out_filepath, skip_tags = skip_tags)
+    return
