@@ -1,8 +1,11 @@
+from datetime import datetime
+import itertools
+import re
+import requests
+import sys
+import time
 from bs4 import BeautifulSoup
 import numpy as np
-import requests
-import itertools
-import sys
 from wordcloud import WordCloud
 
 
@@ -33,80 +36,7 @@ def toint(a):
     return int(a)
 
 
-def info_mainpage(url):
-    """ Given the main tag page, this function gets basic information about tag
-    pages and tag names and their scores as well.
-    On the basic info, there are three numbers scraped :
-    1. Number of tag pages
-    2. Total number of tags
-    3. Number of tags per page
-
-    Parameters
-    ----------
-    url : string
-        URL link to user's main tag page.
-
-    Output
-    ------
-    pginfo : dict
-        Dictionary that holds the three page info as listed earlier.
-
-    name : list of strings
-        Holds the tag names
-
-    count : list of ints
-        Holds the tag scores
-    """
-
-    soup = BeautifulSoup(requests.get(url).text, "lxml")
-
-    pg_blk = soup.find_all("div", class_="pager fr")
-    tag_blk = soup.find_all("div", class_="answer-votes")
-    tag_blk_str = [str(i) for i in tag_blk]
-    str0 = find_between(str(soup.find_all("span", class_="count")))
-    lim_ntags = int(str0.replace(',', ''))
-
-    max_tags = None
-    num_pages = 1
-    if len(pg_blk) != 0:
-        max_tags = len(tag_blk)
-        last_page_blk = pg_blk[0].find_all("span", class_="page-numbers")[-2]
-        num_pages = int(find_between(str(last_page_blk)))
-    pginfo = {'pages': num_pages, 'tags': lim_ntags, 'tags_perpage': max_tags}
-
-    name = [unquote_str(find_between(i, '[', ']')) for i in tag_blk_str]
-    count = [toint(find_between(i)) for i in tag_blk_str]
-    return pginfo, name, count
-
-
-def stackoverflow_taginfo(url):
-    """ Get information about an user's tags from their Stack Overflow
-    tag pages fed as the input URL. Mainly two pieces of information are
-    scraped : tag names and their respective counts/scores.
-
-    Parameters
-    ----------
-    url : string
-        URL link to user's main tag page.
-
-    Output
-    ------
-    name : list of strings
-        Holds the tag names
-
-    count : list of ints
-        Holds the tag scores
-    """
-
-    soup = BeautifulSoup(requests.get(url).text, "lxml")
-    tag_blk = soup.find_all("div", class_="answer-votes")
-    tag_blk_str = [str(i) for i in tag_blk]
-    name = [unquote_str(find_between(i, '[', ']')) for i in tag_blk_str]
-    count = [toint(find_between(i)) for i in tag_blk_str]
-    return name, count
-
-
-def taginfo(link, lim_num_tags=None, return_sort=True, print_page_count=False):
+def taginfo(link, lim_num_tags=None, print_page_count=False, request_frequency=1.5):
     """ Get information about Stack Overflow and all Stack Exchange sites users'
     tags (tags and corresponding tag points scored).
     This could be directly used with wordcloud module for generating tag cloud.
@@ -135,17 +65,17 @@ def taginfo(link, lim_num_tags=None, return_sort=True, print_page_count=False):
         Number of tags to be tracked. Default is None, which tracks all tags
         possible.
 
-    return_sort : bool (default=True)
-        This boolean flag decides whether the output list has the tags
-        sorted by their counts. Since WordCloud module internally sorts
-        them anyway, so for performance one can turn it off.
-
     print_page_count : bool(default=False)
         Print per page progress on processing data.
 
+    request_frequency : float (default=1.5)
+        Number of seconds to wait before making another request. Making
+        requests too often will lead to throttling and eventually timeout
+        errors.
+
     Output
     ------
-    Output is a dictionary with items for tag names and keys for tag count.
+    Output is a dictionary with tag names for keys and tag count for values.
     """
 
     # Get start link (profile page's tag link)
@@ -155,50 +85,55 @@ def taginfo(link, lim_num_tags=None, return_sort=True, print_page_count=False):
         start_link = "http://stackoverflow.com/users/" + str(link) + \
                                                 "?tab=tags&sort=votes&page="
 
-    tag_name = []
-    tag_count = []
+    # regex pattern to match title of tag divs
+    tag_patt = re.compile(r'\d+ non-wiki questions \(\d+ score\)\. \d+ non-wiki answers \(\d+ score\)\.')
+    # pattern to match score inside the title
+    score_patt = re.compile(r'non-wiki answers \((\d+) score\)')
 
-    if print_page_count:
-        print("Processing page : 1/NA")        
+    info = {}
+    last_get = None
+    for page in itertools.count(1):
+        if print_page_count:
+            print("Processing page: ", page)
 
-    info1 = info_mainpage(start_link + '1')
-    num_tags = info1[0]['tags']
-    tag_name.append(info1[1])
-    tag_count.append(info1[2])
-    tags_per_page = len(info1[1])
-    
-    if lim_num_tags is None:
-        num_tags = info1[0]['tags']
-    else:
-        num_tags = min(lim_num_tags, info1[0]['tags'])
-    num_pages = int(np.ceil(num_tags/tags_per_page))
+        if last_get is None:
+            last_get = datetime.now()
+        else:
+            delta = datetime.now() - last_get
+            wait_needed = request_frequency - delta.total_seconds()
+            if wait_needed > 0:
+                time.sleep(wait_needed)
+            last_get = datetime.now()
 
-    print('tags_per_page : '+str(tags_per_page))
-    print('num_tags : '+str(num_tags))
-    print('num_pages : '+str(num_pages))
+        resp = requests.get(start_link + str(page))
+        soup = BeautifulSoup(resp.text, 'lxml')
+        tag_divs = soup.find_all('div', title=tag_patt)
+        if not tag_divs:
+            # we're out of tags
+            break
 
-    if num_pages > 1:
-        num_pages = int(np.ceil(lim_num_tags/float(tags_per_page)))
-        for page_id in range(2, num_pages+1):
-            if print_page_count:
-                print("Processing page : " + str(page_id) + "/" + str(num_pages))
+        if print_page_count:
+            print(len(tag_divs), 'tags found on page')
 
-            url = start_link + str(page_id)
-            page_tag_name, page_tag_count = stackoverflow_taginfo(url)
-            tag_name.append(page_tag_name)
-            tag_count.append(page_tag_count)
+        for tag_div in tag_divs:
+            tag_score = int(score_patt.search(tag_div.get('title')).group(1))
+            tag_name = tag_div.find('a', class_='post-tag').text
+            info[tag_name] = tag_score
 
-    info0 = list(zip(itertools.chain(*tag_name), itertools.chain(*tag_count)))
-    sorted_indx = np.argsort([item[1] for item in info0])[::-1]
-    info = [info0[idx] for idx in sorted_indx][:lim_num_tags]
+            if len(info) == lim_num_tags:
+                # we're done
+                break
+        if len(info) == lim_num_tags:
+            # break out of pagination loop
+            break
 
     # For a case when all tag counts are zeros, it would throw error.
     # So, for such a case, escape it by setting all counts to "1".
-    dict_info = dict(info)
-    if info[0][1] == 0:
-        dict_info = dict.fromkeys(dict_info, 1)
+    if info and max(info.values()) == 0:
+        info = dict.fromkeys(info, 1)
 
-    return dict_info
+    return info
+
 
 def draw_taginfo(info, 
                  image_dims, 
@@ -222,7 +157,6 @@ def draw_taginfo(info,
             WC.to_image().save(out_filepath)
             print("Tag Cloud Saved as " + out_filepath)
             
-    return
 
 def tag_cloud(link=22656, 
               lim_num_tags=200, 
@@ -251,4 +185,3 @@ def tag_cloud(link=22656,
 
     info = taginfo(link=link, lim_num_tags=lim_num_tags)    
     draw_taginfo(info, image_dims=image_dims, out_filepath=out_filepath, skip_tags = skip_tags)
-    return
